@@ -22,7 +22,8 @@ library(lubridate)
 
 ```{r}
 sierra_amphibians_data <- read_xlsx(here("sierra_amphibians.xlsx")) %>% 
-  mutate(survey_date = ymd(survey_date))
+  mutate(survey_date = ymd(survey_date),
+         year = year(survey_date))
   
 ```
 
@@ -32,6 +33,9 @@ A graph of total mountain yellow-legged frog (Rana muscosa) count each year acro
 yellow_legged_frog <- sierra_amphibians_data %>% 
   filter(amphibian_species == "RAMU",
          amphibian_life_stage != "EggMass")
+
+yellow_frog_summary <- yellow_legged_frog %>% 
+  summarise(
   
 ```
 
