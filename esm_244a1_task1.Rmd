@@ -17,6 +17,7 @@ library(tidyverse)
 library(patchwork)
 library(readxl)
 library(lubridate)
+library(patchwork)
 
 ```
 
@@ -35,7 +36,35 @@ yellow_legged_frog <- sierra_amphibians_data %>%
          amphibian_life_stage != "EggMass")
 
 yellow_frog_summary <- yellow_legged_frog %>% 
-  summarise(
+  group_by(year, amphibian_life_stage) %>% 
+  summarise(n = n())
+
+p1 <- ggplot(data = yellow_frog_summary, aes(x = year, y = n)) +
+  geom_col(aes(fill = amphibian_life_stage)) +
+  theme_minimal() +
+  labs(x = "Year", y = "Number of Yellow-legged Frogs")
+  
+```
+
+```{r}
+
+yellow_frog_lake <- yellow_legged_frog %>% 
+  filter(amphibian_life_stage != "Tadpole") %>% # remove tadpole observations
+  group_by(lake_id) %>% 
+  summarize(n = n()) %>% # find counts for each lake
+  slice_max(n = 9, order_by = (n)) # 
+
+# add Lake before each id number
+yellow_frog_lake$lake_id <- sub("^", "Lake ", yellow_frog_lake$lake_id) 
+
+p2 <- ggplot(data = yellow_frog_lake, aes(y = reorder(lake_id, n), x = n)) +
+  geom_col(aes(fill = lake_id)) +
+  theme_minimal() +
+  labs(x = "Total Observed Counts (n)",
+       y = " ") +
+  theme(legend.position = "none")
+
+wrap_plots(p1, p2)
   
 ```
 
