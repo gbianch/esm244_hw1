@@ -53,17 +53,17 @@ p1 <- ggplot(data = yellow_frog_summary, aes(x = year, y = n)) +
 yellow_frog_lake <- yellow_legged_frog %>% 
   filter(amphibian_life_stage != "Tadpole") %>% # remove tadpole observations
   group_by(lake_id) %>% 
-  summarize(n = n()) %>% # find counts for each lake
-  slice_max(n = 9, order_by = (n)) # 
+  summarize(n = sum(amphibian_number)) %>% # find counts for each lake
+  slice_max(n = 5, order_by = (n)) # 
 
 # add Lake before each id number
 yellow_frog_lake$lake_id <- sub("^", "Lake ", yellow_frog_lake$lake_id) 
 
-p2 <- ggplot(data = yellow_frog_lake, aes(y = reorder(lake_id, n), x = n)) +
+p2 <- ggplot(data = yellow_frog_lake, aes(x = reorder(lake_id, n), y = n)) +
   geom_col(aes(fill = lake_id), show.legend = FALSE) +
   theme_minimal() +
-  labs(x = "Total Observed Counts (n)",
-       y = " ")
+  labs(y = "Total Observed Counts (n)",
+       x = " ")
   
   
 plot_grid(p1, p2)
