@@ -1,0 +1,68 @@
+---
+title: "HW1_task2"
+author: "Grace Bianchi"
+date: "2023-02-02"
+output: html_document
+---
+
+```{r setup, include=TRUE, message = FALSE, warning = FALSE, echo = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(AICcmodavg)
+```
+
+Data summary: You will explore the relationship between O2 saturation of seawater off California’s coast and several physical and chemical variables. From the CalCOFI site: “Since 1949, hydrographic and biological data of the California Current System have been collected on CalCOFI cruises. The 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations. In 1961, nutrient analysis expanded to include silicate, nitrate and nitrite; in 1973, chlorophyll was added; in 1984, C14 primary productivity incubations were added; and in 1993, CTD profiling began.”
+
+Data citation: CalCOFI data are available for use without restriction. Data downloaded from https://calcofi.org/ccdata.html.  Accessed 1/10/2022.
+
+
+```{r}
+# read in data
+
+```
+
+Complete Task 2 in a single well-organized .Rmd. Read in the seawater sample data (calcofi_seawaxter_samples.csv), then create and compare two multiple linear regression models:
+
+
+## Model 1
+Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
+```{r}
+## multiple linear regression model 1 w Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
+
+
+```
+
+
+# Model 2
+Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
+```{r}
+## multiple linear regression model 2 w Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
+```
+
+
+## Identify better model using following 3 methods
+
+Method 1 - AICc (in the AICcmodavg package, either AICc() or aictab()) 
+```{r}
+
+```
+
+
+
+Method 2 - BIC (BIC() in base R  or bictab() in the AICcmodavg package) 
+```{r}
+
+```
+
+
+Method 3 - 
+Perform a ten-fold cross validation on the two models, using root-mean-square error as the scoring method. Remember that your final model should be trained on the full dataset, not any of the folds.  You may use a for loop, or purrr, or tidymodels method, whichever you prefer.
+If your methods indicate different models as the best one, identify which model you would use and explain your reasoning.
+
+
+
+Challenge yourself (optional!) - try one or both of these:
+Explore other possible models - there may be other combinations of the available variables that provide an even better-performing model than these two.  If you identify a better performing model, report the AIC and cross validation results for your new model, along with the results for the two models listed above.  
+In the K-fold cross validation, create a nested for-loop (a for loop inside another for loop) to perform multiple iterations of your 10-fold cross validation, with different random folds assigned for each iteration.  Make sure to use a different indexing variable (e.g., the outer loop might start for(j in 1:n_iterations) while the inner loop might start for(i in 1:n_folds))
+
