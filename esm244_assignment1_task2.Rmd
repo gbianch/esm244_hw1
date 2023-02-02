@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(AICcmodavg)
+library(janitor)
 ```
 
 Data summary: You will explore the relationship between O2 saturation of seawater off California’s coast and several physical and chemical variables. From the CalCOFI site: “Since 1949, hydrographic and biological data of the California Current System have been collected on CalCOFI cruises. The 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations. In 1961, nutrient analysis expanded to include silicate, nitrate and nitrite; in 1973, chlorophyll was added; in 1984, C14 primary productivity incubations were added; and in 1993, CTD profiling began.”
