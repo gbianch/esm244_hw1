@@ -5,62 +5,144 @@ date: "2023-02-02"
 output: html_document
 ---
 
+##Intro
+
+This code wrangles and examines a small subset of seawater sample data from CalCOFI. Two linear regression models are used to predict oxygen saturation based on several chemical and physical variables, and compared using AIC, BIC, and cross validation. Specifically, one model examines the relationship between O2 saturation of seawater off California's coast and water temperature, salinity, and phosphate concentration; and the second model examines the relationship between oxygen saturation and water temperature, salinity, phosphate concentration, and depth.
+
+**Data Summary from the CalCOFI site:** “Since 1949, hydrographic and biological data of the California Current System have been collected on CalCOFI cruises. The 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations. In 1961, nutrient analysis expanded to include silicate, nitrate and nitrite; in 1973, chlorophyll was added; in 1984, C14 primary productivity incubations were added; and in 1993, CTD profiling began.”
+
+
+**Data citation:** CalCOFI data are available for use without restriction. Data downloaded from https://calcofi.org/ccdata.html.  Accessed 1/10/2022.
+
+
 ```{r setup, include=TRUE, message = FALSE, warning = FALSE, echo = TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(AICcmodavg)
 library(janitor)
+library(here)
 ```
 
-Data summary: You will explore the relationship between O2 saturation of seawater off California’s coast and several physical and chemical variables. From the CalCOFI site: “Since 1949, hydrographic and biological data of the California Current System have been collected on CalCOFI cruises. The 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations. In 1961, nutrient analysis expanded to include silicate, nitrate and nitrite; in 1973, chlorophyll was added; in 1984, C14 primary productivity incubations were added; and in 1993, CTD profiling began.”
 
-Data citation: CalCOFI data are available for use without restriction. Data downloaded from https://calcofi.org/ccdata.html.  Accessed 1/10/2022.
-
-
-```{r}
+```{r read in data}
 # read in data
+seawater_samples_data <- read_csv(here("calcofi_seawater_samples.csv"))
 
+samples <- seawater_samples_data %>% 
+  select()
 ```
 
 Complete Task 2 in a single well-organized .Rmd. Read in the seawater sample data (calcofi_seawaxter_samples.csv), then create and compare two multiple linear regression models:
 
 
-## Model 1
+### Model 1
 Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
 ```{r}
 ## multiple linear regression model 1 w Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
 
+f1 <- o2sat ~ t_deg_c + salinity + po4u_m
+mdl1 <- lm(formula = f1, data = seawater_samples_data)
+# summary(mdl1)
+# AIC(mdl1)
 
+
+# Coefficients:
+ #           Estimate Std. Error t value Pr(>|t|)    
+#v(Intercept) 195.7345    93.9380   2.084   0.0398 *  
+#vt_deg_c      -0.4700     0.3902  -1.205   0.2313    
+#vsalinity     -2.1350     2.9344  -0.728   0.4686    
+#vpo4u_m      -38.4778     2.5207 -15.265   <2e-16 ***
+---
+#vSignif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#vResidual standard error: 5.173 on 96 degrees of freedom
+#vMultiple R-squared:  0.9554,	Adjusted R-squared:  0.954 
+# F-statistic: 685.5 on 3 and 96 DF,  p-value: < 2.2e-16'
+  
+# AIC: 618.3868
 ```
 
 
-# Model 2
+### Model 2
 Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
 ```{r}
 ## multiple linear regression model 2 w Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
+
+f2 <- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
+mdl2 <- lm(formula = f2, data = seawater_samples_data)
+# summary(mdl2)
+# AIC(mdl2)
+
+# Coefficients:
+ #            Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) 144.06686   95.36730   1.511   0.1342    
+# t_deg_c      -0.74981    0.40494  -1.852   0.0672 .  
+# salinity     -0.43945    2.98897  -0.147   0.8834    
+# po4u_m      -37.71159    2.50113 -15.078   <2e-16 ***
+# depth_m      -0.03196    0.01497  -2.135   0.0354 *  
+
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# Residual standard error: 5.08 on 95 degrees of freedom
+#Multiple R-squared:  0.9574,	Adjusted R-squared:  0.9557 
+# F-statistic: 534.3 on 4 and 95 DF,  p-value: < 2.2e-16
+
+# AIC: 615.7016
+  
 ```
 
+The adjusted R^2^ indicates that either model explains ~95% of the observed
 
 ## Identify better model using following 3 methods
 
 Method 1 - AICc (in the AICcmodavg package, either AICc() or aictab()) 
+
 ```{r}
+AIC(mdl1, mdl2)
+#     df  AIC
+# mdl1	5	618.3868		
+# mdl2	6	615.7016
+
+AICc(mdl1) # 619.0251
+
+AICc(mdl2) # 616.6048
+
+aictab(list(mdl1, mdl2))
+
+#     K   AICc Delta_AICc AICcWt Cum.Wt      LL
+# Mod2 6 616.60       0.00   0.77   0.77 -301.85
+# Mod1 5 619.03       2.42   0.23   1.00 -304.19
 
 ```
-
+From this, the second model is the"best
 
 
 Method 2 - BIC (BIC() in base R  or bictab() in the AICcmodavg package) 
-```{r}
 
+```{r}
+bictab(list(mdl1, mdl2))
+
+#      K    BIC Delta_BIC BICWt Cum.Wt      LL
+# Mod2 6 631.33      0.00  0.51   0.51 -301.85
+# Mod1 5 631.41      0.08  0.49   1.00 -304.19
 ```
 
 
-Method 3 - 
+Method 3 - Ten-Fold Cross Validation
 Perform a ten-fold cross validation on the two models, using root-mean-square error as the scoring method. Remember that your final model should be trained on the full dataset, not any of the folds.  You may use a for loop, or purrr, or tidymodels method, whichever you prefer.
 If your methods indicate different models as the best one, identify which model you would use and explain your reasoning.
 
+```{r}
+set.seed(123)
+
+
+n_folds <- 10
+fold_vec <- rep(1:n_folds, length.out = nrow(adelie_chinstrap))
+ad_chin_kfold <- adelie_chinstrap %>%
+  mutate(fold = sample(fold_vec, size = n(), replace = FALSE))
+
+```
 
 
 Challenge yourself (optional!) - try one or both of these:
