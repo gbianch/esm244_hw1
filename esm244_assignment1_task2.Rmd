@@ -22,6 +22,9 @@ library(tidyverse)
 library(AICcmodavg)
 library(janitor)
 library(here)
+library(broom)
+library(kableExtra)
+
 ```
 
 
@@ -29,8 +32,6 @@ library(here)
 # read in data
 seawater_samples_data <- read_csv(here("calcofi_seawater_samples.csv"))
 
-samples <- seawater_samples_data %>% 
-  select()
 ```
 
 Complete Task 2 in a single well-organized .Rmd. Read in the seawater sample data (calcofi_seawaxter_samples.csv), then create and compare two multiple linear regression models:
@@ -43,23 +44,15 @@ Oxygen saturation as a function of water temperature, salinity, and phosphate co
 
 f1 <- o2sat ~ t_deg_c + salinity + po4u_m
 mdl1 <- lm(formula = f1, data = seawater_samples_data)
-# summary(mdl1)
+
+mdl1_summary <- summary(mdl1)
+
+tidy(mdl1_summary) %>% 
+  kable(caption = "Model 1...") %>% 
+  kable_classic()
+
+
 # AIC(mdl1)
-
-
-# Coefficients:
- #           Estimate Std. Error t value Pr(>|t|)    
-#v(Intercept) 195.7345    93.9380   2.084   0.0398 *  
-#vt_deg_c      -0.4700     0.3902  -1.205   0.2313    
-#vsalinity     -2.1350     2.9344  -0.728   0.4686    
-#vpo4u_m      -38.4778     2.5207 -15.265   <2e-16 ***
----
-#vSignif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-#vResidual standard error: 5.173 on 96 degrees of freedom
-#vMultiple R-squared:  0.9554,	Adjusted R-squared:  0.954 
-# F-statistic: 685.5 on 3 and 96 DF,  p-value: < 2.2e-16'
-  
 # AIC: 618.3868
 ```
 
@@ -71,18 +64,14 @@ Oxygen saturation as a function of water temp, salinity, phosphate concentration
 
 f2 <- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
 mdl2 <- lm(formula = f2, data = seawater_samples_data)
-# summary(mdl2)
+
+mdl2_summary <- summary(mdl2)
+
+tidy(mdl2_summary) %>% 
+  kable(caption = "Model 2...") %>% 
+  kable_classic()
+
 # AIC(mdl2)
-
-# Coefficients:
- #            Estimate Std. Error t value Pr(>|t|)    
-# (Intercept) 144.06686   95.36730   1.511   0.1342    
-# t_deg_c      -0.74981    0.40494  -1.852   0.0672 .  
-# salinity     -0.43945    2.98897  -0.147   0.8834    
-# po4u_m      -37.71159    2.50113 -15.078   <2e-16 ***
-# depth_m      -0.03196    0.01497  -2.135   0.0354 *  
-
-# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 # Residual standard error: 5.08 on 95 degrees of freedom
 #Multiple R-squared:  0.9574,	Adjusted R-squared:  0.9557 
@@ -93,6 +82,7 @@ mdl2 <- lm(formula = f2, data = seawater_samples_data)
 ```
 
 The adjusted R^2^ indicates that either model explains ~95% of the observed
+Model 1 Adjusted r squared : `r mdl1_summary$adj.r.squared`
 
 ## Identify better model using following 3 methods
 
@@ -118,8 +108,7 @@ aictab(list(mdl1, mdl2))
 From this, the second model is the"best
 
 
-Method 2 - BIC (BIC() in base R  or bictab() in the AICcmodavg package) 
-
+Method 2 - BIC
 ```{r}
 bictab(list(mdl1, mdl2))
 
@@ -133,17 +122,94 @@ Method 3 - Ten-Fold Cross Validation
 Perform a ten-fold cross validation on the two models, using root-mean-square error as the scoring method. Remember that your final model should be trained on the full dataset, not any of the folds.  You may use a for loop, or purrr, or tidymodels method, whichever you prefer.
 If your methods indicate different models as the best one, identify which model you would use and explain your reasoning.
 
-```{r}
+```{r eval = FALSE}
 set.seed(123)
 
-
 n_folds <- 10
-fold_vec <- rep(1:n_folds, length.out = nrow(adelie_chinstrap))
-ad_chin_kfold <- adelie_chinstrap %>%
+fold_vec <- rep(1:n_folds, length.out = nrow(seawater_samples_data))
+seawater_kfold <- seawater_samples_data %>%
   mutate(fold = sample(fold_vec, size = n(), replace = FALSE))
+
+results_df <- data.frame()
+pred_acc <- function(x, y) {
+  accurate <- ifelse(x == y, 1, 0)
+  return(mean(accurate, na.rm = TRUE))
+}
+
+
+for(i in 1:n_folds) {
+  kfold_test <- seawater_kfold %>%
+    filter(fold == i)
+  kfold_train <- seawater_kfold %>%
+    filter(fold != i)
+  
+  kfold_blr1 <- glm(f1, data = kfold_train, family = 'binomial')
+  kfold_blr2 <- glm(f2, data = kfold_train, family = 'binomial')
+  kfold_pred <- kfold_test %>%
+    mutate(blr1 = predict(kfold_blr1, kfold_test, type = 'response'),
+           blr2 = predict(kfold_blr2, ., type = 'response')) %>%
+    mutate(pred1 = ifelse(blr1 > 0.50, 'Chinstrap', 'Adelie'),
+           pred2 = ifelse(blr2 > 0.50, 'Chinstrap', 'Adelie'))
+  kfold_accuracy <- kfold_pred %>%
+    summarize(blr1_acc = pred_acc(species, pred1),
+              blr2_acc = pred_acc(species, pred2))
+  
+  results_df <- bind_rows(results_df, kfold_accuracy)
+}
+
+
+results_df %>%
+  summarize(blr1_acc = mean(blr1_acc),
+            blr2_acc = mean(blr2_acc))
 
 ```
 
+```{r eval = FALSE}
+# function to calculate accuracy, given a "truth" vector and "prediction" vector
+pred_acc <- function(x, y) {
+  accurate <- ifelse(x == y, 1, 0)
+  return(mean(accurate, na.rm = TRUE))
+}
+
+# function to calculate accuracy of BLR of one fold (training and testing)
+calc_fold <- function(i, fold_df, f) {
+  kfold_test <- fold_df %>%
+    filter(fold == i)
+  kfold_train <- fold_df %>%
+    filter(fold != i)
+  
+  kfold_blr <- glm(f, data = kfold_train, family = 'binomial')
+  kfold_pred <- kfold_test %>%
+    mutate(blr = predict(kfold_blr, kfold_test, type = 'response')) %>%
+    mutate(pred = ifelse(blr > 0.50, 'Chinstrap', 'Adelie'))
+  
+  kfold_accuracy <- kfold_pred %>%
+    summarize(blr_acc = pred_acc(species, pred)) # using my other function
+  
+  return(kfold_accuracy)
+}
+
+n_folds <- 10
+
+results1_purrr_df <- purrr::map(.x = 1:n_folds, # sequence of fold numbers
+                                .f = calc_fold, # function
+                                fold_df = ad_chin_kfold, # additional argument to calc_fold()
+                                f = f1) %>%              # additional argument to calc_fold()
+  bind_rows() %>%
+  mutate(mdl = 'f1')
+
+results2_purrr_df <- purrr::map(.x = 1:n_folds, .f = calc_fold, 
+                               fold_df = ad_chin_kfold,
+                               f = f2) %>%
+  bind_rows() %>%
+  mutate(mdl = 'f2')
+
+results_purrr_df <- bind_rows(results1_purrr_df, results2_purrr_df) %>%
+  group_by(mdl) %>%
+  summarize(mean_acc = mean(blr_acc))
+
+results_purrr_df
+```
 
 Challenge yourself (optional!) - try one or both of these:
 Explore other possible models - there may be other combinations of the available variables that provide an even better-performing model than these two.  If you identify a better performing model, report the AIC and cross validation results for your new model, along with the results for the two models listed above.  
