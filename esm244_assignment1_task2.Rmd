@@ -15,6 +15,8 @@ This code wrangles and examines a small subset of seawater sample data from CalC
 **Data citation:** CalCOFI data are available for use without restriction. Data downloaded from https://calcofi.org/ccdata.html.  Accessed 1/10/2022.
 
 
+### Data Setup and Wrangling
+
 ```{r setup, include=TRUE, message = FALSE, warning = FALSE, echo = TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -24,51 +26,54 @@ library(janitor)
 library(here)
 library(broom)
 library(kableExtra)
+library(tidymodels)
 
 ```
 
 
 ```{r read in data}
 # read in data
-seawater_samples_data <- read_csv(here("calcofi_seawater_samples.csv"))
+seawater_samples <- read_csv(here("calcofi_seawater_samples.csv"))
 
 ```
 
 Complete Task 2 in a single well-organized .Rmd. Read in the seawater sample data (calcofi_seawaxter_samples.csv), then create and compare two multiple linear regression models:
 
 
-### Model 1
-Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
+### Multiple Linear Regression Model 1
+
+Oxygen saturation is observed as a function of water temperature, salinity, and phosphate concentration.
+
 ```{r}
 ## multiple linear regression model 1 w Oxygen saturation as a function of water temperature, salinity, and phosphate concentration
 
 f1 <- o2sat ~ t_deg_c + salinity + po4u_m
-mdl1 <- lm(formula = f1, data = seawater_samples_data)
+mdl1 <- lm(formula = f1, data = seawater_samples)
 
 mdl1_summary <- summary(mdl1)
 
 tidy(mdl1_summary) %>% 
-  kable(caption = "Model 1...") %>% 
+  kable(caption = "Model 1 Variable Coefficients") %>% 
   kable_classic()
-
 
 # AIC(mdl1)
 # AIC: 618.3868
 ```
 
 
-### Model 2
-Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
+### Multiple Linear Regression Model 2
+
+This model explores the relationship of oxygen saturation as a function of water temperature, salinity, phosphate concentration, and depth.
+
 ```{r}
 ## multiple linear regression model 2 w Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
-
 f2 <- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
-mdl2 <- lm(formula = f2, data = seawater_samples_data)
+mdl2 <- lm(formula = f2, data = seawater_samples)
 
 mdl2_summary <- summary(mdl2)
 
 tidy(mdl2_summary) %>% 
-  kable(caption = "Model 2...") %>% 
+  kable(caption = "Model 2 Variable Coeffecients") %>% 
   kable_classic()
 
 # AIC(mdl2)
@@ -81,137 +86,112 @@ tidy(mdl2_summary) %>%
   
 ```
 
-The adjusted R^2^ indicates that either model explains ~95% of the observed
-Model 1 Adjusted r squared : `r mdl1_summary$adj.r.squared`
+The adjusted R^2^ indicates that either model explains ~95% of the observed variance (**Model 1 Adjusted R^2^ =** `r mdl1_summary$adj.r.squared`,
+**Model 2 Adjusted R^2^ =** `r mdl2_summary$adj.r.squared`). Next, AIC is used to identify the model that maximizes the likelihood of the parameter values given the data. 
 
 ## Identify better model using following 3 methods
 
-Method 1 - AICc (in the AICcmodavg package, either AICc() or aictab()) 
+### Method 1 - Akaike Information Criteria (AIC)
 
-```{r}
-AIC(mdl1, mdl2)
+
+```{r AIC }
+AIC(mdl1, mdl2) # comparing AIC values
 #     df  AIC
 # mdl1	5	618.3868		
 # mdl2	6	615.7016
 
-AICc(mdl1) # 619.0251
-
-AICc(mdl2) # 616.6048
-
-aictab(list(mdl1, mdl2))
+(aictab(list(mdl1, mdl2))) %>% kable(caption = "comparison of model using AIC") %>% 
+  kable_classic() # putting values into table
 
 #     K   AICc Delta_AICc AICcWt Cum.Wt      LL
 # Mod2 6 616.60       0.00   0.77   0.77 -301.85
 # Mod1 5 619.03       2.42   0.23   1.00 -304.19
 
 ```
-From this, the second model is the"best
 
+After looking at the AIC values for both models, the second model is the "better" model due to the lower AIC score. The difference (delta = 2.42) between AIC values indicates a significant difference in model fit. 
 
-Method 2 - BIC
+### Method 2 - BIC
+
 ```{r}
-bictab(list(mdl1, mdl2))
+bictab(list(mdl1, mdl2)) %>% kable() %>% kable_classic()
 
 #      K    BIC Delta_BIC BICWt Cum.Wt      LL
 # Mod2 6 631.33      0.00  0.51   0.51 -301.85
 # Mod1 5 631.41      0.08  0.49   1.00 -304.19
 ```
 
+BIC results for both model are too close to select the better option. 
 
-Method 3 - Ten-Fold Cross Validation
-Perform a ten-fold cross validation on the two models, using root-mean-square error as the scoring method. Remember that your final model should be trained on the full dataset, not any of the folds.  You may use a for loop, or purrr, or tidymodels method, whichever you prefer.
-If your methods indicate different models as the best one, identify which model you would use and explain your reasoning.
+### Method 3 - Ten-Fold Cross Validation
 
-```{r eval = FALSE}
-set.seed(123)
+A ten-fold cross validation is performed on the two models, using root-mean-square error as the scoring method. 
 
-n_folds <- 10
-fold_vec <- rep(1:n_folds, length.out = nrow(seawater_samples_data))
-seawater_kfold <- seawater_samples_data %>%
-  mutate(fold = sample(fold_vec, size = n(), replace = FALSE))
+```{r 10 fold CV}
+set.seed(444) ### set seed for reproducibility! here to set the folds
 
-results_df <- data.frame()
-pred_acc <- function(x, y) {
-  accurate <- ifelse(x == y, 1, 0)
-  return(mean(accurate, na.rm = TRUE))
-}
+### use a workflow that bundles the logistic model and a formula
+seawater_lm <- linear_reg() %>% 
+  set_engine("lm")
 
+tidy_folds <- vfold_cv(seawater_samples, v = 10)
 
-for(i in 1:n_folds) {
-  kfold_test <- seawater_kfold %>%
-    filter(fold == i)
-  kfold_train <- seawater_kfold %>%
-    filter(fold != i)
-  
-  kfold_blr1 <- glm(f1, data = kfold_train, family = 'binomial')
-  kfold_blr2 <- glm(f2, data = kfold_train, family = 'binomial')
-  kfold_pred <- kfold_test %>%
-    mutate(blr1 = predict(kfold_blr1, kfold_test, type = 'response'),
-           blr2 = predict(kfold_blr2, ., type = 'response')) %>%
-    mutate(pred1 = ifelse(blr1 > 0.50, 'Chinstrap', 'Adelie'),
-           pred2 = ifelse(blr2 > 0.50, 'Chinstrap', 'Adelie'))
-  kfold_accuracy <- kfold_pred %>%
-    summarize(blr1_acc = pred_acc(species, pred1),
-              blr2_acc = pred_acc(species, pred2))
-  
-  results_df <- bind_rows(results_df, kfold_accuracy)
-}
+lm_tidy_wf1 <- workflow() %>% 
+  add_model(seawater_lm) %>% 
+  add_formula(f1)
+
+lm_tidy_cv_f1 <- lm_tidy_wf1 %>% 
+  fit_resamples(tidy_folds)
 
 
-results_df %>%
-  summarize(blr1_acc = mean(blr1_acc),
-            blr2_acc = mean(blr2_acc))
+mdl_rmse <- collect_metrics(lm_tidy_cv_f1) %>% ### use functions from the tune package to extract metrics
+  filter(.metric == "rmse") %>% 
+  select(.metric, mean, n, std_err) %>% ## selecting data to make table with both model rmse
+  rename(model = .metric) 
+
+mdl_rmse[1:1] <- "mdl1" # pulling out rmse data
 
 ```
 
-```{r eval = FALSE}
-# function to calculate accuracy, given a "truth" vector and "prediction" vector
-pred_acc <- function(x, y) {
-  accurate <- ifelse(x == y, 1, 0)
-  return(mean(accurate, na.rm = TRUE))
-}
+```{r}
+# repeat for model 2
+lm_tidy_wf2 <- workflow() %>% 
+  add_model(seawater_lm) %>% 
+  add_formula(f2)
 
-# function to calculate accuracy of BLR of one fold (training and testing)
-calc_fold <- function(i, fold_df, f) {
-  kfold_test <- fold_df %>%
-    filter(fold == i)
-  kfold_train <- fold_df %>%
-    filter(fold != i)
-  
-  kfold_blr <- glm(f, data = kfold_train, family = 'binomial')
-  kfold_pred <- kfold_test %>%
-    mutate(blr = predict(kfold_blr, kfold_test, type = 'response')) %>%
-    mutate(pred = ifelse(blr > 0.50, 'Chinstrap', 'Adelie'))
-  
-  kfold_accuracy <- kfold_pred %>%
-    summarize(blr_acc = pred_acc(species, pred)) # using my other function
-  
-  return(kfold_accuracy)
-}
+lm_tidy_cv_f2 <- lm_tidy_wf2 %>% 
+  fit_resamples(tidy_folds)
 
-n_folds <- 10
+mdl2_rmse <- collect_metrics(lm_tidy_cv_f2) %>% ### use functions from the tune package to extract metrics
+  filter(.metric == "rmse") %>% 
+  select(.metric, mean, n, std_err) %>% 
+  rename(model = .metric) 
 
-results1_purrr_df <- purrr::map(.x = 1:n_folds, # sequence of fold numbers
-                                .f = calc_fold, # function
-                                fold_df = ad_chin_kfold, # additional argument to calc_fold()
-                                f = f1) %>%              # additional argument to calc_fold()
-  bind_rows() %>%
-  mutate(mdl = 'f1')
+mdl2_rmse[1:1] <- "mdl2" # pull out rmse data
 
-results2_purrr_df <- purrr::map(.x = 1:n_folds, .f = calc_fold, 
-                               fold_df = ad_chin_kfold,
-                               f = f2) %>%
-  bind_rows() %>%
-  mutate(mdl = 'f2')
+mdl_rmse %>% # merge two tables
+  full_join(mdl2_rmse) %>% 
+  kable(caption = "Comparison of Model Root Mean Squared Error") %>% # create table
+  kable_classic()
 
-results_purrr_df <- bind_rows(results1_purrr_df, results2_purrr_df) %>%
-  group_by(mdl) %>%
-  summarize(mean_acc = mean(blr_acc))
-
-results_purrr_df
 ```
 
-Challenge yourself (optional!) - try one or both of these:
-Explore other possible models - there may be other combinations of the available variables that provide an even better-performing model than these two.  If you identify a better performing model, report the AIC and cross validation results for your new model, along with the results for the two models listed above.  
-In the K-fold cross validation, create a nested for-loop (a for loop inside another for loop) to perform multiple iterations of your 10-fold cross validation, with different random folds assigned for each iteration.  Make sure to use a different indexing variable (e.g., the outer loop might start for(j in 1:n_iterations) while the inner loop might start for(i in 1:n_folds))
+The root mean square error is lower for model 2, thus it is the better model. The model is trained using the full dataset to identify the coefficients for the final model.
+
+# Final model
+AIC and cross-validation both indicate Model 2 as the "best" model. There are several things to consider upon selecting a model; specifically the size of the data set and the number of variables. Since the data set is fairly small (n = 100), AIC is the better indicator model fit, coonsidering the extra parameter.
+
+Our final model:
+`r equatiomatic::extract_eq(mdl2, wrap = TRUE)`
+
+and with coefficients in place:
+`r equatiomatic::extract_eq(mdl2, wrap = TRUE, use_coefs = TRUE)`
+
+
+```{r}
+final_mdl <- lm(f2, data = seawater_samples)
+summary(final_mdl) %>% 
+  tidy() %>% 
+  kable() %>%  kable_classic()
+```
 
